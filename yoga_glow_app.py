@@ -428,7 +428,7 @@ class GeminiContentGenerator:
     
     def generate_yoga_content_ideas(self, sub_niche: str, user_profile: Dict, count: int = 5) -> str:
         lifestyle = user_profile.get('lifestyle', 'full_time_job')
-        followers = user_profile.get('followers', 100)
+        followers = user_profile.get('followers', 260)
         
         prompt = f"""You are a warm, supportive content coach helping a yoga instructor grow their Instagram.
 
