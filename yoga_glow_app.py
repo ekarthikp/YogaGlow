@@ -255,14 +255,14 @@ if 'user_profile' not in st.session_state:
     try:
         st.session_state.user_profile = {
             'name': st.secrets.get('USER_NAME', os.getenv('USER_NAME', '')),
-            'followers': int(st.secrets.get('USER_FOLLOWERS', os.getenv('USER_FOLLOWERS', '100'))),
+            'followers': int(st.secrets.get('USER_FOLLOWERS', os.getenv('USER_FOLLOWERS', '260'))),
             'yoga_style': st.secrets.get('USER_YOGA_STYLE', os.getenv('USER_YOGA_STYLE', 'General/Vinyasa')),
             'lifestyle': st.secrets.get('USER_LIFESTYLE', os.getenv('USER_LIFESTYLE', 'full_time_job'))
         }
     except:
         st.session_state.user_profile = {
             'name': os.getenv('USER_NAME', ''),
-            'followers': int(os.getenv('USER_FOLLOWERS', '100')),
+            'followers': int(os.getenv('USER_FOLLOWERS', '260')),
             'yoga_style': os.getenv('USER_YOGA_STYLE', 'General/Vinyasa'),
             'lifestyle': os.getenv('USER_LIFESTYLE', 'full_time_job')
         }
@@ -324,6 +324,63 @@ def increment_api_count():
 def get_remaining_calls() -> int:
     """Get remaining API calls for this session."""
     return max(0, MAX_API_CALLS_PER_SESSION - st.session_state.api_call_count)
+
+
+def create_html_download(content: str, topic: str) -> str:
+    """Create a downloadable HTML file from the generated content."""
+    timestamp = datetime.now().strftime("%Y-%m-%d")
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>YogaGlow Ideas for {topic}</title>
+        <style>
+            body {{
+                font-family: system-ui, -apple-system, sans-serif;
+                max-width: 800px;
+                margin: 40px auto;
+                padding: 20px;
+                line-height: 1.6;
+                color: #333;
+                background-color: #f8fafc;
+            }}
+            .header {{
+                text-align: center;
+                padding-bottom: 30px;
+                border-bottom: 2px solid #e2e8f0;
+                margin-bottom: 30px;
+            }}
+            .logo {{
+                font-size: 2rem;
+                color: #8B5CF6;
+                margin-bottom: 10px;
+            }}
+            .content-card {{
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                margin-bottom: 20px;
+            }}
+            h1, h2, h3 {{ color: #1e293b; }}
+            .date {{ color: #64748b; font-size: 0.9rem; }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="logo">🧘 YogaGlow</div>
+            <h1>Content Ideas: {topic}</h1>
+            <div class="date">Generated on {timestamp}</div>
+        </div>
+        <div class="content-card">
+            {content.replace(chr(10), '<br>')}
+        </div>
+    </body>
+    </html>
+    """
+    return html
 
 
 class TrendAnalyzer:
@@ -431,7 +488,7 @@ def main():
         default_profile = st.session_state.user_profile
         
         name = st.text_input("Your Name", value=default_profile.get('name', ''), placeholder="e.g., Sarah")
-        followers = st.number_input("Current Followers", min_value=0, max_value=100000, value=default_profile.get('followers', 100), step=50)
+        followers = st.number_input("Current Followers", min_value=0, max_value=100000, value=default_profile.get('followers', 260), step=50)
         
         yoga_styles = ["General/Vinyasa", "Beginner-Friendly", "Flexibility", "Stress Relief", "Desk Yoga", "Yoga for Sleep"]
         default_style = default_profile.get('yoga_style', 'General/Vinyasa')
@@ -565,6 +622,18 @@ def main():
         
         if st.session_state.content_ideas:
             st.markdown("---")
+            
+            # Download Button
+            if st.session_state.content_ideas:
+                topic = custom_topic if idea_type == "✨ Other (Custom)" else idea_type
+                html_content = create_html_download(st.session_state.content_ideas, topic)
+                st.download_button(
+                    label="📥 Download Ideas as HTML",
+                    data=html_content,
+                    file_name=f"yoga_ideas_{topic.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.html",
+                    mime="text/html"
+                )
+            
             st.markdown(st.session_state.content_ideas)
         
         st.markdown("---")
