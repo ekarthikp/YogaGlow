@@ -1063,24 +1063,18 @@ def main():
                 sanitized_topic = sanitize_input(topic)
                 if sanitized_topic:
                     with st.spinner("✍️ Writing your caption..."):
-                        # Build tagging instruction for the prompt
-                        tag_instruction = ""
-                        if all_tags:
-                            tag_instruction = f"\n\nAt the end of the caption, include a 'Tag & Share' line that naturally mentions these accounts: {', '.join(all_tags)}. Make the tagging feel organic (e.g., 'Inspired by @account' or 'Tag a friend who needs this! 🧘‍♀️') rather than just listing handles."
-
-                        prompt = f"Write a {mood.lower()} Instagram caption for a yoga instructor about: {sanitized_topic}. Type: {content_type}. 150-250 words, use 2-3 emojis, end with engagement question.{tag_instruction}"
+                        prompt = f"Write a {mood.lower()} Instagram caption for a yoga instructor about: {sanitized_topic}. Type: {content_type}. 150-250 words, use 2-3 emojis, end with engagement question. End the caption with a block of relevant hashtags."
                         try:
                             response = content_generator.model.generate_content(prompt)
                             caption_text = response.text
+
+                            # Append tags after the caption (after hashtags, no extra text)
+                            if all_tags:
+                                caption_text = caption_text.rstrip() + "\n\n" + " ".join(all_tags)
+
                             safe_caption = html_lib.escape(caption_text).replace('\n', '<br>')
                             st.markdown(f'<div class="caption-display">{safe_caption}</div>', unsafe_allow_html=True)
-
-                            # Show tags as a ready-to-copy block below the caption
-                            if all_tags:
-                                tags_str = ' '.join(all_tags)
-                                st.markdown(f'<div class="tags-output"><strong>📋 Tags to copy:</strong><br>{html_lib.escape(tags_str)}</div>', unsafe_allow_html=True)
-
-                            st.markdown("*💡 Tip: Select the text above to copy your caption and tags!*")
+                            st.markdown("*💡 Tip: Select the text above to copy your caption!*")
                             increment_api_count()
                         except Exception as e:
                             st.error(f"Caption generation failed. Please try again or check your API key. ({type(e).__name__})")
