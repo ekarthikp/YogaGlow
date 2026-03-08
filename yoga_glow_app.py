@@ -352,6 +352,52 @@ st.markdown("""
         margin-top: 4px;
     }
 
+    /* Tag Pill (selectable) */
+    .tag-pill {
+        display: inline-block;
+        background: rgba(139, 92, 246, 0.1);
+        color: #C4B5FD;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        margin: 4px;
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        cursor: default;
+    }
+    .tag-pill.selected {
+        background: rgba(139, 92, 246, 0.3);
+        border-color: var(--accent-purple);
+        color: white;
+    }
+    .tag-section {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        padding: 20px;
+        margin: 16px 0;
+    }
+    .tag-section h4 { margin-bottom: 12px; }
+    .tags-output {
+        background: rgba(139, 92, 246, 0.05);
+        border: 1px dashed rgba(139, 92, 246, 0.3);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 12px;
+        font-size: 0.95rem;
+        line-height: 1.8;
+        word-break: break-word;
+    }
+    .custom-tag-badge {
+        display: inline-block;
+        background: rgba(245, 158, 11, 0.15);
+        color: #FCD34D;
+        padding: 4px 12px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        margin: 3px;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
     /* Empty State */
     .empty-state {
         text-align: center;
@@ -419,6 +465,8 @@ if 'current_week' not in st.session_state:
     st.session_state.current_week = 1
 if 'api_call_count' not in st.session_state:
     st.session_state.api_call_count = 0
+if 'custom_tags' not in st.session_state:
+    st.session_state.custom_tags = []
 
 # Security Configuration
 MAX_API_CALLS_PER_SESSION = 25
@@ -934,6 +982,80 @@ def main():
 
         mood = st.select_slider("Vibe", options=["Professional", "Warm & Friendly", "Playful", "Peaceful", "Motivating"], value="Warm & Friendly")
 
+        # --- Influencer Tagging Section ---
+        st.markdown("---")
+        st.markdown("#### 🏷️ Tag Accounts")
+
+        # Famous yoga influencers organized by category
+        famous_influencers = {
+            "Top Yoga Creators": [
+                "@yoga", "@yogajournal", "@alo.yoga", "@adrienelouise",
+                "@yogawithadriene", "@beachyogagirl", "@kinoyoga",
+                "@yogainternational"
+            ],
+            "Wellness & Mindfulness": [
+                "@mindbodygreen", "@headspace", "@calm",
+                "@deepakchopra", "@gabormate.official"
+            ],
+            "Yoga Communities": [
+                "@doyogawithme", "@yogagirl", "@iamyogini",
+                "@yoga_inspire", "@yogaeverydamnday"
+            ]
+        }
+
+        selected_influencers = []
+        for category, accounts in famous_influencers.items():
+            st.markdown(f"**{category}**")
+            selected = st.multiselect(
+                f"Select from {category}",
+                accounts,
+                key=f"influencer_{category}",
+                label_visibility="collapsed"
+            )
+            selected_influencers.extend(selected)
+
+        # Custom user tags
+        st.markdown("**Your Custom Accounts**")
+        custom_tag_input = st.text_input(
+            "Add accounts to tag (comma-separated)",
+            placeholder="e.g., @youryogafriend, @localyogastudio, @yogabrand",
+            key="custom_tag_input"
+        )
+
+        # Parse and validate custom tags
+        new_custom_tags = []
+        if custom_tag_input:
+            for tag in custom_tag_input.split(","):
+                tag = tag.strip()
+                if tag and not tag.startswith("@"):
+                    tag = "@" + tag
+                if tag:
+                    # Basic validation: alphanumeric, underscores, periods (Instagram rules)
+                    handle = tag[1:]  # remove @
+                    if handle and all(c.isalnum() or c in '._' for c in handle) and len(handle) <= 30:
+                        new_custom_tags.append(tag)
+
+        # Combine saved + new custom tags (deduplicated)
+        all_custom_tags = list(dict.fromkeys(st.session_state.custom_tags + new_custom_tags))
+
+        # Show saved custom tags
+        if all_custom_tags:
+            tags_html = ''.join(f'<span class="custom-tag-badge">{html_lib.escape(t)}</span>' for t in all_custom_tags)
+            st.markdown(f'<div>{tags_html}</div>', unsafe_allow_html=True)
+
+        if new_custom_tags and st.button("💾 Save Custom Tags", key="save_tags"):
+            st.session_state.custom_tags = all_custom_tags
+            st.success(f"Saved {len(all_custom_tags)} custom tag(s)!")
+
+        # Merge all tags
+        all_tags = selected_influencers + all_custom_tags
+        all_tags = list(dict.fromkeys(all_tags))  # deduplicate
+
+        if all_tags:
+            st.markdown(f"**Selected tags ({len(all_tags)}):** {' '.join(all_tags)}")
+
+        st.markdown("---")
+
         if st.button("✨ Generate Caption", type="primary"):
             if not check_rate_limit():
                 st.error(f"🚫 You've reached the limit of {MAX_API_CALLS_PER_SESSION} generations per session. Please refresh to reset.")
@@ -941,14 +1063,24 @@ def main():
                 sanitized_topic = sanitize_input(topic)
                 if sanitized_topic:
                     with st.spinner("✍️ Writing your caption..."):
-                        prompt = f"Write a {mood.lower()} Instagram caption for a yoga instructor about: {sanitized_topic}. Type: {content_type}. 150-250 words, use 2-3 emojis, end with engagement question."
+                        # Build tagging instruction for the prompt
+                        tag_instruction = ""
+                        if all_tags:
+                            tag_instruction = f"\n\nAt the end of the caption, include a 'Tag & Share' line that naturally mentions these accounts: {', '.join(all_tags)}. Make the tagging feel organic (e.g., 'Inspired by @account' or 'Tag a friend who needs this! 🧘‍♀️') rather than just listing handles."
+
+                        prompt = f"Write a {mood.lower()} Instagram caption for a yoga instructor about: {sanitized_topic}. Type: {content_type}. 150-250 words, use 2-3 emojis, end with engagement question.{tag_instruction}"
                         try:
                             response = content_generator.model.generate_content(prompt)
                             caption_text = response.text
-                            # Render caption in a styled card using pure HTML (st.write inside HTML div doesn't work in Streamlit)
                             safe_caption = html_lib.escape(caption_text).replace('\n', '<br>')
                             st.markdown(f'<div class="caption-display">{safe_caption}</div>', unsafe_allow_html=True)
-                            st.markdown("*💡 Tip: Select the text above to copy your caption!*")
+
+                            # Show tags as a ready-to-copy block below the caption
+                            if all_tags:
+                                tags_str = ' '.join(all_tags)
+                                st.markdown(f'<div class="tags-output"><strong>📋 Tags to copy:</strong><br>{html_lib.escape(tags_str)}</div>', unsafe_allow_html=True)
+
+                            st.markdown("*💡 Tip: Select the text above to copy your caption and tags!*")
                             increment_api_count()
                         except Exception as e:
                             st.error(f"Caption generation failed. Please try again or check your API key. ({type(e).__name__})")
